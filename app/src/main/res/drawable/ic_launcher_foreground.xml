@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Solvex logo — two mascot characters side by side
+    🔥 Fire (center x=36): flame tip (36,18) → base (36,76)
+    💧 Water (center x=72): circle top r=15 center (72,43), tip (72,76)
+    Both have cartoon eyes looking toward each other.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ══════════════════════════════════════════
+         🔥  FIRE CHARACTER  —  left  (x ≈ 20–52)
+         ══════════════════════════════════════════ -->
+
+    <!-- Flame body: tip at (36,18), base at (36,76).
+         Outer curves bulge to x≈52 (right) / x≈20 (left). -->
+    <path android:pathData="
+        M 36,18
+        C 44,28 52,42 46,54
+        C 48,64 46,74 36,76
+        C 26,74 24,64 26,54
+        C 20,42 28,28 36,18 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="36" android:startY="18"
+                android:endX="36"   android:endY="76">
+                <item android:offset="0.0"  android:color="#FFE566" />
+                <item android:offset="0.42" android:color="#FF8C00" />
+                <item android:offset="1.0"  android:color="#C81400" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner flame glow — brighter core -->
+    <path
+        android:pathData="
+            M 36,26
+            C 41,34 46,44 42,52
+            C 43,59 42,66 36,68
+            C 30,66 29,59 30,52
+            C 26,44 31,34 36,26 Z"
+        android:fillColor="#FFE566"
+        android:alpha="0.22" />
+
+    <!-- Fire — LEFT EYE white (center 30,44  r=5) -->
+    <path
+        android:pathData="M 25,44 A 5,5 0 0,0 35,44 A 5,5 0 0,0 25,44 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- Fire — LEFT PUPIL  (center 31,45  r=3, shifted right = looking at water) -->
+    <path
+        android:pathData="M 28,45 A 3,3 0 0,0 34,45 A 3,3 0 0,0 28,45 Z"
+        android:fillColor="#1A0500" />
+    <!-- Fire — LEFT EYE SHINE (center 29,43  r=1.5) -->
+    <path
+        android:pathData="M 27,43 A 2,2 0 0,0 31,43 A 2,2 0 0,0 27,43 Z"
+        android:fillColor="#FFFFFF"
+        android:alpha="0.88" />
+
+    <!-- Fire — RIGHT EYE white (center 42,44  r=5) -->
+    <path
+        android:pathData="M 37,44 A 5,5 0 0,0 47,44 A 5,5 0 0,0 37,44 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- Fire — RIGHT PUPIL  (center 43,45  r=3, shifted right = looking at water) -->
+    <path
+        android:pathData="M 40,45 A 3,3 0 0,0 46,45 A 3,3 0 0,0 40,45 Z"
+        android:fillColor="#1A0500" />
+    <!-- Fire — RIGHT EYE SHINE (center 41,43  r=1.5) -->
+    <path
+        android:pathData="M 39,43 A 2,2 0 0,0 43,43 A 2,2 0 0,0 39,43 Z"
+        android:fillColor="#FFFFFF"
+        android:alpha="0.88" />
+
+
+    <!-- ══════════════════════════════════════════
+         💧  WATER CHARACTER  —  right  (x ≈ 57–87)
+         Rounded top: circle center (72,43) r=15 → top at (72,28)
+         Pointed tip at (72,76)
+         ══════════════════════════════════════════ -->
+
+    <!-- Drop body -->
+    <path android:pathData="
+        M 72,76
+        C 62,66 57,56 57,43
+        A 15,15 0 0,0 87,43
+        C 87,56 82,66 72,76 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="72" android:startY="28"
+                android:endX="72"   android:endY="76">
+                <item android:offset="0.0"  android:color="#AAEEFF" />
+                <item android:offset="0.40" android:color="#0AB4FF" />
+                <item android:offset="1.0"  android:color="#002E99" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Drop specular sheen — upper-left crescent -->
+    <path
+        android:pathData="M 60,34 C 60,28 65,24 70,25 C 66,27 62,30 60,34 Z"
+        android:fillColor="#FFFFFF"
+        android:alpha="0.28" />
+
+    <!-- Water — LEFT EYE white (center 65,38  r=5) -->
+    <path
+        android:pathData="M 60,38 A 5,5 0 0,0 70,38 A 5,5 0 0,0 60,38 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- Water — LEFT PUPIL  (center 64,39  r=3, shifted left = looking at fire) -->
+    <path
+        android:pathData="M 61,39 A 3,3 0 0,0 67,39 A 3,3 0 0,0 61,39 Z"
+        android:fillColor="#000A1A" />
+    <!-- Water — LEFT EYE SHINE (center 63,37  r=1.5) -->
+    <path
+        android:pathData="M 61,37 A 2,2 0 0,0 65,37 A 2,2 0 0,0 61,37 Z"
+        android:fillColor="#FFFFFF"
+        android:alpha="0.88" />
+
+    <!-- Water — RIGHT EYE white (center 79,38  r=5) -->
+    <path
+        android:pathData="M 74,38 A 5,5 0 0,0 84,38 A 5,5 0 0,0 74,38 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- Water — RIGHT PUPIL  (center 78,39  r=3, shifted left = looking at fire) -->
+    <path
+        android:pathData="M 75,39 A 3,3 0 0,0 81,39 A 3,3 0 0,0 75,39 Z"
+        android:fillColor="#000A1A" />
+    <!-- Water — RIGHT EYE SHINE (center 77,37  r=1.5) -->
+    <path
+        android:pathData="M 75,37 A 2,2 0 0,0 79,37 A 2,2 0 0,0 75,37 Z"
+        android:fillColor="#FFFFFF"
+        android:alpha="0.88" />
+
+</vector>
