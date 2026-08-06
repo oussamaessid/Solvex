@@ -21,18 +21,13 @@ import app.solvex.viewmodel.GameViewModel
 
 @Composable
 fun LevelSelectScreen(vm: GameViewModel, darkMode: Boolean) {
-    val bg = if (darkMode) DarkBg else LightBg
-    val textColor = if (darkMode) Color.White else Color(0xFF1A1A3E)
+    val textColor = Color(0xFF1A1A3E)
     val totalLevels by vm.levelCount.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(bg, if (darkMode) Color(0xFF0A0A22) else Color(0xFFE8EAFF))
-                )
-            )
+            .background(Color.White)
             .padding(16.dp)
     ) {
         // Header
@@ -41,7 +36,7 @@ fun LevelSelectScreen(vm: GameViewModel, darkMode: Boolean) {
             modifier = Modifier.padding(top = 8.dp)
         ) {
             TextButton(onClick = { vm.navigate(AppScreen.HOME) }) {
-                Text("← Back", color = if (darkMode) Color.White else Color(0xFF333366), fontSize = 16.sp)
+                Text("← Back", color = Color(0xFF333366), fontSize = 16.sp)
             }
             Spacer(Modifier.weight(1f))
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -61,7 +56,7 @@ fun LevelSelectScreen(vm: GameViewModel, darkMode: Boolean) {
 
         Text(
             "$totalLevels niveaux  •  6×6",
-            color = if (darkMode) Color(0xFF8888CC) else Color(0xFF6666AA),
+            color = Color(0xFF6666AA),
             fontSize = 13.sp,
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
         )

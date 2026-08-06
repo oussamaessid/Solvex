@@ -26,7 +26,7 @@ fun StatsScreen(vm: GameViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFF0F2FF))))
+            .background(Color.White)
             .padding(horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

@@ -20,9 +20,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.solvex.R
 import app.solvex.model.AppScreen
 import app.solvex.ui.theme.*
 import app.solvex.viewmodel.GameViewModel
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -35,18 +42,6 @@ fun VictoryScreen(vm: GameViewModel, darkMode: Boolean) {
     val stats by vm.stats.collectAsState()
 
     val textColor = Color(0xFF1A1A3E)
-
-    val infiniteTransition = rememberInfiniteTransition(label = "victory")
-    val fireGlow by infiniteTransition.animateFloat(
-        1f, 1.3f,
-        infiniteRepeatable(tween(700, easing = EaseInOutSine), RepeatMode.Reverse),
-        label = "fireGlow"
-    )
-    val waterGlow by infiniteTransition.animateFloat(
-        1.3f, 1f,
-        infiniteRepeatable(tween(700, easing = EaseInOutSine), RepeatMode.Reverse),
-        label = "waterGlow"
-    )
 
     var show by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { show = true }
@@ -61,10 +56,15 @@ fun VictoryScreen(vm: GameViewModel, darkMode: Boolean) {
 
     val stars = starsForTime(gs.elapsedSeconds, gs.level.size, gs.hintsUsed)
 
+    LaunchedEffect(gs.level.id) {
+        delay(5000L)
+        vm.nextLevel()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFF0F2FF))))
+            .background(Color.White)
     ) {
         ConfettiCanvas()
 
@@ -77,11 +77,16 @@ fun VictoryScreen(vm: GameViewModel, darkMode: Boolean) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("🔥", fontSize = 64.sp, modifier = Modifier.scale(fireGlow))
-                Text("+", fontSize = 32.sp, color = textColor, fontWeight = FontWeight.Bold)
-                Text("💧", fontSize = 64.sp, modifier = Modifier.scale(waterGlow))
-            }
+            val trophyComposition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.trophy))
+            val trophyProgress by animateLottieCompositionAsState(
+                trophyComposition,
+                iterations = LottieConstants.IterateForever
+            )
+            LottieAnimation(
+                composition = trophyComposition,
+                progress = { trophyProgress },
+                modifier = Modifier.size(180.dp)
+            )
 
             Spacer(Modifier.height(16.dp))
 
@@ -166,6 +171,31 @@ fun VictoryScreen(vm: GameViewModel, darkMode: Boolean) {
             }
 
             Spacer(Modifier.height(16.dp))
+
+            Button(
+                onClick = { vm.nextLevel() },
+                modifier = Modifier.fillMaxWidth(0.85f).height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(listOf(FireOrange, FireRed)),
+                            RoundedCornerShape(14.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Next Level →",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
 
             TextButton(onClick = { vm.navigate(AppScreen.HOME) }) {
                 Text(

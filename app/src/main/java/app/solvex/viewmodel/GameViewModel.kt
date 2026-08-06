@@ -30,7 +30,8 @@ data class UserStats(
     val totalLevels: Int = 0,
     val dailyCount: Int = 0,
     val dailyTime: Int = 0,
-    val totalDays: Int = 0
+    val totalDays: Int = 0,
+    val currentLevel: Int = 1
 ) {
     val winPercent: Int get() = if (totalDays > 0) dailyCount * 100 / totalDays else 0
 }
@@ -50,6 +51,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _gameState = MutableStateFlow<GameState?>(null)
     val gameState: StateFlow<GameState?> = _gameState.asStateFlow()
+
+    private val _showBrokenHeart = MutableStateFlow(false)
+    val showBrokenHeart: StateFlow<Boolean> = _showBrokenHeart.asStateFlow()
 
     private val _darkMode = MutableStateFlow(prefs.getBoolean("dark_mode", false))
     val darkMode: StateFlow<Boolean> = _darkMode.asStateFlow()
@@ -79,39 +83,24 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     fun navigate(screen: AppScreen) { _screen.value = screen }
 
-    // Play → level 1 on June 12 2026, level 2 on June 13, etc.
-    @SuppressLint("NewApi")
+    // Play → always resumes from the furthest level reached; finishing a level
+    // immediately unlocks the next one (no daily/one-per-day gating).
     fun resumePlay() {
         isDaily = true
         val allLevels = LevelRepository.getAll()
-        val today = LocalDate.now().toEpochDay()
-        val dayOffset = (today - 20616L).coerceAtLeast(0L)
+        val progressIndex = prefs.getInt("progress_index", 0)
         if (allLevels.isNotEmpty()) {
-            val index = (dayOffset % allLevels.size).toInt()
-            val rawLevel = allLevels[index]
-            val level = rawLevel.copy(isDaily = true, levelNumber = index + 1)
-            val todayAlreadyDone = prefs.getLong("streak_last_date", -1L) == today
-            if (todayAlreadyDone) {
-                val completedBoard = loadCompletedBoard(rawLevel.id, rawLevel.size)
-                val time = prefs.getInt("daily_last_time", 0)
-                val hints = prefs.getInt("daily_last_hints", 0)
-                _gameState.value = GameState(
-                    level = level,
-                    board = completedBoard ?: rawLevel.clues.map { it.toList() },
-                    isComplete = true,
-                    wasAlreadyComplete = true,
-                    elapsedSeconds = time,
-                    hintsUsed = hints
-                )
-                _screen.value = AppScreen.VICTORY
-            } else {
-                loadLevel(level)
-            }
+            val index = progressIndex.coerceIn(0, allLevels.size - 1)
+            currentLevelIndex = index
+            val level = allLevels[index].copy(isDaily = true, levelNumber = index + 1)
+            loadLevel(level)
         } else {
+            val index = progressIndex.coerceIn(0, TOTAL_LEVELS - 1)
+            currentLevelIndex = index
             loadLevel(
-                PuzzleGenerator.daily(today).copy(
+                PuzzleGenerator.generate(index, 9001L + index * 7919L).copy(
                     isDaily = true,
-                    levelNumber = (dayOffset % 820 + 1).toInt()
+                    levelNumber = index + 1
                 )
             )
         }
@@ -129,12 +118,27 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         loadLevel(level)
     }
 
+    fun nextLevel() {
+        val allLevels = LevelRepository.getAll()
+        val total = if (allLevels.isNotEmpty()) allLevels.size else TOTAL_LEVELS
+        val next = (currentLevelIndex + 1).coerceAtMost(total - 1)
+        startLevel(next)
+    }
+
     private fun loadLevel(level: GameLevel) {
         val saved = loadBoardState(level.id, level.size)
+        val (savedLives, savedHints, savedNextLifeAt) = loadLivesState()
+        val (lives, nextLifeAt) = regenLives(savedLives, savedNextLifeAt)
+        if (lives != savedLives || nextLifeAt != savedNextLifeAt) {
+            saveLivesState(lives, savedHints, nextLifeAt)
+        }
         _gameState.value = GameState(
             level = level,
             board = saved?.first ?: level.clues.map { it.toList() },
-            elapsedSeconds = saved?.second ?: 0
+            elapsedSeconds = saved?.second ?: 0,
+            lives = lives,
+            hints = savedHints,
+            nextLifeAtMillis = nextLifeAt
         )
         startTimer()
         _screen.value = AppScreen.GAME
@@ -143,6 +147,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     fun tapCell(row: Int, col: Int) {
         val state = _gameState.value ?: return
         if (state.isComplete) return  // board is locked when complete
+        if (state.lives <= 0) return  // board is locked when out of lives
+        if (_showBrokenHeart.value) return  // board is locked while the mistake animation plays
         val level = state.level
         if (level.clues[row][col] != CellElement.EMPTY) return
         val next = GameValidator.nextElement(state.board[row][col])
@@ -160,14 +166,22 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         )
         if (!complete) {
             saveBoardState(level.id, newBoard, state.elapsedSeconds)
-            // Show errors after 2-second delay so user can self-correct
+            // Show errors after 2-second delay so user can self-correct; a confirmed
+            // mistake at that point costs one life.
             errorJob = viewModelScope.launch {
                 delay(2000L)
                 val cur = _gameState.value ?: return@launch
-                if (!cur.isComplete) {
-                    _gameState.value = cur.copy(
-                        errorCells = GameValidator.getErrors(cur.board, cur.level)
-                    )
+                if (cur.isComplete) return@launch
+                val newErrors = GameValidator.getErrors(cur.board, cur.level)
+                if (newErrors.isNotEmpty() && cur.errorCells.isEmpty()) {
+                    val wasFull = cur.lives >= MAX_LIVES
+                    val newLives = (cur.lives - 1).coerceAtLeast(0)
+                    val newNextLifeAt = if (wasFull) System.currentTimeMillis() + LIFE_REGEN_MS else cur.nextLifeAtMillis
+                    saveLivesState(newLives, cur.hints, newNextLifeAt)
+                    _gameState.value = cur.copy(errorCells = newErrors, lives = newLives, nextLifeAtMillis = newNextLifeAt)
+                    _showBrokenHeart.value = true
+                } else {
+                    _gameState.value = cur.copy(errorCells = newErrors)
                 }
             }
         }
@@ -178,10 +192,37 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             saveCompletedBoard(level.id, newBoard)
             clearBoardState(level.id)
             saveCompleted(level.id, state.elapsedSeconds, state.hintsUsed)
+            advanceProgressIfNeeded()
             viewModelScope.launch {
                 delay(400)
                 _screen.value = AppScreen.VICTORY
             }
+        }
+    }
+
+    // Called once the broken-heart animation finishes playing: wipes only the
+    // fire/water cell(s) that don't match the solution, not the whole
+    // row/column that got flagged by the balance/constraint checks.
+    fun onErrorAnimationEnd() {
+        _showBrokenHeart.value = false
+        val state = _gameState.value ?: return
+        if (state.errorCells.isEmpty()) return
+        val solution = state.level.solution
+        val clearedBoard = state.board.mapIndexed { r, rowList ->
+            rowList.mapIndexed { c, el ->
+                if ((r to c) in state.errorCells && el != solution[r][c]) CellElement.EMPTY else el
+            }
+        }
+        saveBoardState(state.level.id, clearedBoard, state.elapsedSeconds)
+        _gameState.value = state.copy(board = clearedBoard, errorCells = emptySet())
+    }
+
+    private fun advanceProgressIfNeeded() {
+        val allLevels = LevelRepository.getAll()
+        val total = if (allLevels.isNotEmpty()) allLevels.size else TOTAL_LEVELS
+        val idx = prefs.getInt("progress_index", 0)
+        if (currentLevelIndex >= idx && idx < total - 1) {
+            prefs.edit().putInt("progress_index", currentLevelIndex + 1).apply()
         }
     }
 
@@ -199,6 +240,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val state = _gameState.value ?: return
         errorJob?.cancel()
         clearBoardState(state.level.id)
+        // Lives/hints are a shared pool across all levels, so restarting a
+        // level clears the board only — it does not refill the pool.
         _gameState.value = state.copy(
             board = state.level.clues.map { it.toList() },
             history = emptyList(),
@@ -212,21 +255,47 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     fun useHint() {
         val state = _gameState.value ?: return
+        if (state.hints <= 0) return
+        val hintBoard = revealHintCell(state) ?: return
+        val newHints = state.hints - 1
+        saveLivesState(state.lives, newHints, state.nextLifeAtMillis)
+        _gameState.value = state.copy(
+            board = hintBoard,
+            hints = newHints,
+            hintsUsed = state.hintsUsed + 1,
+            errorCells = GameValidator.getErrors(hintBoard, state.level)
+        )
+    }
+
+    // Called after the user watches a rewarded ad while out of hints — adds one
+    // to the counter rather than revealing a cell directly.
+    fun addHint() {
+        val state = _gameState.value ?: return
+        val newHints = state.hints + 1
+        saveLivesState(state.lives, newHints, state.nextLifeAtMillis)
+        _gameState.value = state.copy(hints = newHints)
+    }
+
+    // Called after the user watches a rewarded ad while out of lives.
+    fun addLife() {
+        val state = _gameState.value ?: return
+        val newLives = (state.lives + 1).coerceAtMost(MAX_LIVES)
+        val newNextLifeAt = if (newLives >= MAX_LIVES) 0L else state.nextLifeAtMillis
+        saveLivesState(newLives, state.hints, newNextLifeAt)
+        _gameState.value = state.copy(lives = newLives, nextLifeAtMillis = newNextLifeAt)
+    }
+
+    private fun revealHintCell(state: GameState): List<List<CellElement>>? {
         val empties = (0 until state.level.size).flatMap { r ->
             (0 until state.level.size).map { c -> r to c }
         }.filter { (r, c) -> state.board[r][c] == CellElement.EMPTY }
-        if (empties.isEmpty()) return
+        if (empties.isEmpty()) return null
         val (hr, hc) = empties.random()
-        val hintBoard = state.board.mapIndexed { r, row ->
+        return state.board.mapIndexed { r, row ->
             row.mapIndexed { c, el ->
                 if (r == hr && c == hc) state.level.solution[r][c] else el
             }
         }
-        _gameState.value = state.copy(
-            board = hintBoard,
-            hintsUsed = state.hintsUsed + 1,
-            errorCells = GameValidator.getErrors(hintBoard, state.level)
-        )
     }
 
     fun isLevelCompleted(levelIndex: Int): Boolean {
@@ -284,13 +353,34 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putString("done_board_$levelId", flat).apply()
     }
 
-    private fun loadCompletedBoard(levelId: Int, size: Int): List<List<CellElement>>? {
-        val flat = prefs.getString("done_board_$levelId", null) ?: return null
-        val elements = flat.split(",").map {
-            try { CellElement.valueOf(it) } catch (_: Exception) { CellElement.EMPTY }
-        }
-        if (elements.size != size * size) return null
-        return elements.chunked(size)
+    // Lives and hints are a single pool shared across every level, not
+    // tracked per level.
+    private fun saveLivesState(lives: Int, hints: Int, nextLifeAtMillis: Long) {
+        prefs.edit()
+            .putInt("lives", lives)
+            .putInt("hints", hints)
+            .putLong("nextlife", nextLifeAtMillis)
+            .apply()
+    }
+
+    private fun loadLivesState(): Triple<Int, Int, Long> {
+        val lives = prefs.getInt("lives", MAX_LIVES)
+        val hints = prefs.getInt("hints", MAX_HINTS)
+        val nextLifeAt = prefs.getLong("nextlife", 0L)
+        return Triple(lives, hints, nextLifeAt)
+    }
+
+    // Catches lives up on how many hours passed since the regen timer started
+    // (handles the app having been closed for a while).
+    private fun regenLives(lives: Int, nextLifeAtMillis: Long): Pair<Int, Long> {
+        if (lives >= MAX_LIVES || nextLifeAtMillis == 0L) return lives to nextLifeAtMillis
+        val now = System.currentTimeMillis()
+        if (now < nextLifeAtMillis) return lives to nextLifeAtMillis
+        val elapsed = now - nextLifeAtMillis
+        val gained = 1 + (elapsed / LIFE_REGEN_MS).toInt()
+        val newLives = (lives + gained).coerceAtMost(MAX_LIVES)
+        val newNextLifeAt = if (newLives >= MAX_LIVES) 0L else nextLifeAtMillis + gained * LIFE_REGEN_MS
+        return newLives to newNextLifeAt
     }
 
     private fun startTimer() {
@@ -347,7 +437,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             totalLevels = _levelCount.value,
             dailyCount = prefs.getInt("daily_count", 0),
             dailyTime = prefs.getInt("daily_last_time", 0),
-            totalDays = totalDays
+            totalDays = totalDays,
+            currentLevel = prefs.getInt("progress_index", 0) + 1
         )
     }
 
