@@ -1,11 +1,13 @@
 package app.solvex.ui.screens
 
 import android.app.Activity
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +22,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -45,6 +48,8 @@ import java.util.Locale
 fun GameScreen(vm: GameViewModel, darkMode: Boolean) {
     val state by vm.gameState.collectAsState()
     val showBrokenHeart by vm.showBrokenHeart.collectAsState()
+    val showTutorial by vm.showTutorial.collectAsState()
+    BackHandler(enabled = showTutorial) { }
     if (state == null) return
     val gs = state!!
 
@@ -104,6 +109,10 @@ fun GameScreen(vm: GameViewModel, darkMode: Boolean) {
 
             LivesRow(lives = gs.lives, onClick = { showLivesDialog = true })
 
+            // Rules stay visible directly below the lives.
+            GameRuleCards()
+            Spacer(Modifier.height(10.dp))
+
             // Rule chips, grid and action buttons — centered as one group
             // in the remaining vertical space, so the grid sits in the
             // middle of the screen with the buttons snug right below it.
@@ -117,18 +126,6 @@ fun GameScreen(vm: GameViewModel, darkMode: Boolean) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Rules reminder + constraint legend — centered
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            RuleChip("🔥=💧 per row/col")
-                            RuleChip("No 3 in a row")
-                            ConstraintLegendChip()
-                        }
-                    }
-
                     // Grid — fixed square, centered, white container
                     Box(
                         modifier = Modifier
@@ -144,6 +141,7 @@ fun GameScreen(vm: GameViewModel, darkMode: Boolean) {
                             errorCells = gs.errorCells,
                             size = gs.level.size,
                             darkMode = false,
+                            onDoubleTap = vm::doubleTapCell,
                             onTap = vm::tapCell
                         )
 
@@ -265,6 +263,10 @@ fun GameScreen(vm: GameViewModel, darkMode: Boolean) {
                 },
                 onDismiss = { showHintDialog = false }
             )
+        }
+
+        if (showTutorial) {
+            GameTutorialOverlay(onFinish = vm::finishTutorial)
         }
     }
 }
@@ -544,6 +546,104 @@ private fun RuleChip(text: String) {
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Text(text, fontSize = 10.sp, color = Color(0xFF5555AA))
+    }
+}
+
+@Composable
+private fun ElementBalanceChip() {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFE0E0FF))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = painterResource(R.drawable.mascot_fire),
+            contentDescription = "Fire mascot",
+            modifier = Modifier.size(16.dp)
+        )
+        Text("=", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5555AA))
+        Image(
+            painter = painterResource(R.drawable.mascot_water),
+            contentDescription = "Water mascot",
+            modifier = Modifier.size(16.dp)
+        )
+        Text("row/col", fontSize = 10.sp, color = Color(0xFF5555AA))
+    }
+}
+
+@Composable
+private fun GameRuleCards() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        RuleCard(
+            modifier = Modifier.weight(1f),
+            title = "BALANCE",
+            visual = "🔥 = 💧",
+            subtitle = "each line"
+        )
+        RuleCard(
+            modifier = Modifier.weight(1f),
+            title = "NO TRIPLE",
+            visual = "🔥🔥 ≠ 🔥",
+            subtitle = "row or column"
+        )
+        LinkRuleCard(
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun RuleCard(modifier: Modifier, title: String, visual: String, subtitle: String) {
+    Column(
+        modifier = modifier
+            .height(92.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFE8EAFF))))
+            .padding(horizontal = 4.dp, vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(title, fontSize = 8.sp, fontWeight = FontWeight.Black, color = Color(0xFF6666AA), letterSpacing = 0.6.sp)
+        Text(visual, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1A1A3E), maxLines = 1)
+        Text(subtitle, fontSize = 8.sp, color = Color(0xFF777799), maxLines = 1)
+    }
+}
+
+@Composable
+private fun LinkRuleCard(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .height(92.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Brush.verticalGradient(listOf(Color.White, Color(0xFFE8EAFF))))
+            .padding(horizontal = 3.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("LINKS", fontSize = 8.sp, fontWeight = FontWeight.Black, color = Color(0xFF6666AA), letterSpacing = .5.sp)
+        Row(Modifier.fillMaxWidth()) {
+            LinkIconRow(R.drawable.game_mascot_fire, "=", R.drawable.game_mascot_fire, Modifier.weight(1f))
+            LinkIconRow(R.drawable.game_mascot_water, "=", R.drawable.game_mascot_water, Modifier.weight(1f))
+        }
+        Row(Modifier.fillMaxWidth()) {
+            LinkIconRow(R.drawable.game_mascot_fire, "×", R.drawable.game_mascot_water, Modifier.weight(1f))
+            LinkIconRow(R.drawable.game_mascot_water, "×", R.drawable.game_mascot_fire, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun LinkIconRow(left: Int, sign: String, right: Int, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+        Image(painterResource(left), null, Modifier.size(14.dp))
+        Text(sign, fontSize = 10.sp, fontWeight = FontWeight.Black, color = if (sign == "=") ConstraintEqual else ConstraintDiff)
+        Image(painterResource(right), null, Modifier.size(14.dp))
     }
 }
 

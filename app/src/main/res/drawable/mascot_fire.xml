@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Game-sized version of the fire character used by the Solvex launcher logo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path android:pathData="M32,3 C43,15 53,28 47,41 C51,52 44,61 32,61 C20,61 13,52 17,41 C11,28 22,15 32,3Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="32" android:startY="3" android:endX="32" android:endY="61">
+                <item android:offset="0" android:color="#FFFF70" />
+                <item android:offset="0.45" android:color="#FFFF8C00" />
+                <item android:offset="1" android:color="#FFC81400" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M32,15 C38,23 42,31 39,40 C42,47 38,54 32,55 C26,54 22,47 25,40 C21,31 27,23 32,15Z" android:fillColor="#FFFFE566" android:fillAlpha="0.35" />
+    <path android:pathData="M20,35 A8,8 0,1 0,36 35 A8,8 0,1 0,20 35" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M34,35 A8,8 0,1 0,50 35 A8,8 0,1 0,34 35" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M27,36 A4,5 0,1 0,35 36 A4,5 0,1 0,27 36" android:fillColor="#FF451200" />
+    <path android:pathData="M41,36 A4,5 0,1 0,49 36 A4,5 0,1 0,41 36" android:fillColor="#FF451200" />
+    <path android:pathData="M29,33 A2,2 0,1 0,33 33 A2,2 0,1 0,29 33 M43,33 A2,2 0,1 0,47 33 A2,2 0,1 0,43 33" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M26,48 Q32,54 39,47" android:fillColor="#00000000" android:strokeColor="#FF7A2100" android:strokeWidth="2.3" android:strokeLineCap="round" />
+</vector>

@@ -6,6 +6,8 @@ import android.content.Context
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.solvex.data.LevelRepository
@@ -60,6 +62,11 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _soundEnabled = MutableStateFlow(prefs.getBoolean("sound", true))
     val soundEnabled: StateFlow<Boolean> = _soundEnabled.asStateFlow()
+
+    private val _showTutorial = MutableStateFlow(!prefs.getBoolean("tutorial_seen", false))
+    val showTutorial: StateFlow<Boolean> = _showTutorial.asStateFlow()
+
+    private val toneGenerator = runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 45) }.getOrNull()
 
     private val _hapticsEnabled = MutableStateFlow(prefs.getBoolean("haptics", true))
     val hapticsEnabled: StateFlow<Boolean> = _hapticsEnabled.asStateFlow()
@@ -152,6 +159,14 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val level = state.level
         if (level.clues[row][col] != CellElement.EMPTY) return
         val next = GameValidator.nextElement(state.board[row][col])
+        playTone(
+            when (next) {
+                CellElement.FIRE -> ToneGenerator.TONE_PROP_BEEP
+                CellElement.WATER -> ToneGenerator.TONE_PROP_BEEP2
+                CellElement.EMPTY -> ToneGenerator.TONE_PROP_NACK
+            },
+            if (next == CellElement.EMPTY) 45 else 70
+        )
         val newBoard = state.board.mapIndexed { r, rowList ->
             rowList.mapIndexed { c, el -> if (r == row && c == col) next else el }
         }
@@ -174,6 +189,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 if (cur.isComplete) return@launch
                 val newErrors = GameValidator.getErrors(cur.board, cur.level)
                 if (newErrors.isNotEmpty() && cur.errorCells.isEmpty()) {
+                    playTone(ToneGenerator.TONE_SUP_ERROR, 180)
                     val wasFull = cur.lives >= MAX_LIVES
                     val newLives = (cur.lives - 1).coerceAtLeast(0)
                     val newNextLifeAt = if (wasFull) System.currentTimeMillis() + LIFE_REGEN_MS else cur.nextLifeAtMillis
@@ -187,6 +203,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (_hapticsEnabled.value) vibrate(if (complete) 60L else 20L)
         if (complete) {
+            playTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 250)
             timerJob?.cancel()
             errorJob?.cancel()
             saveCompletedBoard(level.id, newBoard)
@@ -197,6 +214,21 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 delay(400)
                 _screen.value = AppScreen.VICTORY
             }
+        }
+    }
+
+    /** Double-tapping an editable cell places Water directly. */
+    fun doubleTapCell(row: Int, col: Int) {
+        val state = _gameState.value ?: return
+        if (state.isComplete || state.lives <= 0 || _showBrokenHeart.value) return
+        if (state.level.clues[row][col] != CellElement.EMPTY) return
+        when (state.board[row][col]) {
+            CellElement.EMPTY -> {
+                tapCell(row, col)
+                tapCell(row, col)
+            }
+            CellElement.FIRE -> tapCell(row, col)
+            CellElement.WATER -> Unit
         }
     }
 
@@ -257,6 +289,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val state = _gameState.value ?: return
         if (state.hints <= 0) return
         val hintBoard = revealHintCell(state) ?: return
+        playTone(ToneGenerator.TONE_PROP_ACK, 120)
         val newHints = state.hints - 1
         saveLivesState(state.lives, newHints, state.nextLifeAtMillis)
         _gameState.value = state.copy(
@@ -315,6 +348,17 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         _soundEnabled.value = !_soundEnabled.value
         prefs.edit().putBoolean("sound", _soundEnabled.value).apply()
     }
+
+    fun openTutorial() { _showTutorial.value = true }
+
+    fun finishTutorial() {
+        prefs.edit().putBoolean("tutorial_seen", true).apply()
+        _showTutorial.value = false
+    }
+
+    private fun playTone(tone: Int, durationMs: Int) {
+        if (_soundEnabled.value) toneGenerator?.startTone(tone, durationMs)
+    }
     fun toggleHaptics() {
         _hapticsEnabled.value = !_hapticsEnabled.value
         prefs.edit().putBoolean("haptics", _hapticsEnabled.value).apply()
@@ -322,6 +366,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         super.onCleared()
+        toneGenerator?.release()
         errorJob?.cancel()
         val state = _gameState.value ?: return
         if (!state.isComplete) saveBoardState(state.level.id, state.board, state.elapsedSeconds)

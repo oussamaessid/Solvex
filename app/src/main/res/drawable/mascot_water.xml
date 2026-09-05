@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Game-sized version of the water character used by the Solvex launcher logo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path android:pathData="M32,3 C26,15 13,27 13,42 A19,19 0,1 0,51 42 C51,27 38,15 32,3Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="25" android:startY="8" android:endX="42" android:endY="60">
+                <item android:offset="0" android:color="#FFB9F4FF" />
+                <item android:offset="0.45" android:color="#FF15BFFF" />
+                <item android:offset="1" android:color="#FF00349E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M21,23 C22,17 26,12 31,8 C27,16 26,22 25,27Z" android:fillColor="#FFFFFFFF" android:fillAlpha="0.4" />
+    <path android:pathData="M17,38 A8,8 0,1 0,33 38 A8,8 0,1 0,17 38" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M31,38 A8,8 0,1 0,47 38 A8,8 0,1 0,31 38" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M22,39 A4,5 0,1 0,30 39 A4,5 0,1 0,22 39" android:fillColor="#FF00245E" />
+    <path android:pathData="M36,39 A4,5 0,1 0,44 39 A4,5 0,1 0,36 39" android:fillColor="#FF00245E" />
+    <path android:pathData="M23,36 A2,2 0,1 0,27 36 A2,2 0,1 0,23 36 M37,36 A2,2 0,1 0,41 36 A2,2 0,1 0,37 36" android:fillColor="#FFFFFFFF" />
+    <path android:pathData="M26,50 Q32,56 39,49" android:fillColor="#00000000" android:strokeColor="#FF003273" android:strokeWidth="2.3" android:strokeLineCap="round" />
+</vector>
