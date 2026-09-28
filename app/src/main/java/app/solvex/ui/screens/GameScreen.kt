@@ -231,7 +231,8 @@ fun GameScreen(vm: GameViewModel, darkMode: Boolean) {
                 }
             }
         }
-        BannerAd(modifier = Modifier.padding(bottom = 16.dp))
+        // Keep clear space between the game buttons and the banner to avoid accidental clicks.
+        BannerAd(modifier = Modifier.padding(top = 24.dp, bottom = 16.dp))
         }
 
         if (showLivesDialog) {

@@ -12,8 +12,8 @@ android {
         applicationId = "app.solvex"
         minSdk = 24
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.0"
+        versionCode = 10
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -36,6 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -60,4 +61,9 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation("com.github.bumptech.glide:glide:4.16.0")
     implementation("com.airbnb.android:lottie-compose:6.6.0")
+}
+
+// Mise à jour obligatoire (Google Play In-App Updates)
+dependencies {
+    implementation("com.google.android.play:app-update-ktx:2.1.0")
 }

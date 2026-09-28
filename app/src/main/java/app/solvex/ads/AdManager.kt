@@ -2,6 +2,7 @@ package app.solvex.ads
 
 import android.app.Activity
 import android.content.Context
+import app.solvex.BuildConfig
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -13,9 +14,21 @@ import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 
 object AdManager {
-    const val BANNER_AD_UNIT_ID = "ca-app-pub-2498267529185476/1209566467"
-    const val INTERSTITIAL_AD_UNIT_ID = "ca-app-pub-2498267529185476/6793065636"
-    const val REWARDED_AD_UNIT_ID = "ca-app-pub-2498267529185476/1373217999"
+    // Debug builds always use Google's public test ad units so development on your
+    // own phone never serves (or clicks) real ads — that counts as invalid traffic.
+    private val TEST = BuildConfig.DEBUG
+
+    val BANNER_AD_UNIT_ID =
+        if (TEST) "ca-app-pub-3940256099942544/6300978111" else "ca-app-pub-2498267529185476/1209566467"
+    val INTERSTITIAL_AD_UNIT_ID =
+        if (TEST) "ca-app-pub-3940256099942544/1033173712" else "ca-app-pub-2498267529185476/6793065636"
+    val REWARDED_AD_UNIT_ID =
+        if (TEST) "ca-app-pub-3940256099942544/5224354917" else "ca-app-pub-2498267529185476/1373217999"
+
+    // Interstitial frequency cap: at most one every 2 minutes, and never on the first Play tap.
+    private const val MIN_INTER_INTERVAL_MS = 120_000L
+    private var lastInterShownMs = 0L
+    private var interRequests = 0
 
     private var interstitialAd: InterstitialAd? = null
     private var rewardedAd: RewardedAd? = null
@@ -62,12 +75,18 @@ object AdManager {
     }
 
     fun showInterstitial(activity: Activity, onDone: () -> Unit) {
+        interRequests++
         val ad = interstitialAd
-        if (ad == null) {
+        val now = System.currentTimeMillis()
+        if (ad == null || interRequests < 2 || now - lastInterShownMs < MIN_INTER_INTERVAL_MS) {
             onDone()
             return
         }
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdShowedFullScreenContent() {
+                lastInterShownMs = System.currentTimeMillis()
+            }
+
             override fun onAdDismissedFullScreenContent() {
                 interstitialAd = null
                 loadInterstitial(activity)
