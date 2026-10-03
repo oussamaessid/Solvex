@@ -50,3 +50,16 @@ val LightSurface = Color(0xFFFFFFFF)
 // Stars
 val GoldStar   = Color(0xFFFFD700)
 val SilverStar = Color(0xFF9E9E9E)
+
+// Creative refresh — ink, cream & glow tokens
+val InkNavy     = Color(0xFF1A1A3E)
+val InkSoft     = Color(0xFF55557A)
+val InkFaint    = Color(0xFF8A8AA8)
+val CreamBg     = Color(0xFFFFF8EE)
+val LavenderBg  = Color(0xFFF2F0FF)
+val CardWhite   = Color(0xFFFFFFFF)
+val GoldDeep    = Color(0xFF8A5A00)
+val GoldSoft    = Color(0xFFFFF3CC)
+val VioletPop   = Color(0xFF8B5CF6)
+val IndigoPop   = Color(0xFF5B5BEA)
+val MintBg      = Color(0xFFE8FFF1)

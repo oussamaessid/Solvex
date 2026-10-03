@@ -74,12 +74,29 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     private val _stats = MutableStateFlow(UserStats())
     val stats: StateFlow<UserStats> = _stats.asStateFlow()
 
+    private val _coins = MutableStateFlow(prefs.getInt("coins", STARTING_COINS))
+    val coins: StateFlow<Int> = _coins.asStateFlow()
+
+    private val _hints = MutableStateFlow(prefs.getInt("hints", DEFAULT_HINTS))
+    val hints: StateFlow<Int> = _hints.asStateFlow()
+
     private var currentLevelIndex: Int = 0
     private var isDaily: Boolean = false
     private var timerJob: Job? = null
     private var errorJob: Job? = null
+    private var shopReturnScreen: AppScreen = AppScreen.HOME
 
     init {
+        // One-time migration from the former five-hint/shared-lives economy.
+        if (prefs.getInt("economy_version", 0) < 1) {
+            prefs.edit()
+                .putInt("economy_version", 1)
+                .putInt("coins", STARTING_COINS)
+                .putInt("hints", DEFAULT_HINTS)
+                .apply()
+            _coins.value = STARTING_COINS
+            _hints.value = DEFAULT_HINTS
+        }
         viewModelScope.launch(Dispatchers.IO) {
             val loaded = LevelRepository.load(app)
             if (loaded.isNotEmpty()) _levelCount.value = loaded.size
@@ -89,6 +106,17 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun navigate(screen: AppScreen) { _screen.value = screen }
+
+    fun openShop(returnTo: AppScreen = _screen.value) {
+        shopReturnScreen = if (returnTo == AppScreen.SHOP) AppScreen.HOME else returnTo
+        if (shopReturnScreen == AppScreen.GAME) timerJob?.cancel()
+        _screen.value = AppScreen.SHOP
+    }
+
+    fun closeShop() {
+        _screen.value = shopReturnScreen
+        if (shopReturnScreen == AppScreen.GAME) startTimer()
+    }
 
     // Play → always resumes from the furthest level reached; finishing a level
     // immediately unlocks the next one (no daily/one-per-day gating).
@@ -134,18 +162,15 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun loadLevel(level: GameLevel) {
         val saved = loadBoardState(level.id, level.size)
-        val (savedLives, savedHints, savedNextLifeAt) = loadLivesState()
-        val (lives, nextLifeAt) = regenLives(savedLives, savedNextLifeAt)
-        if (lives != savedLives || nextLifeAt != savedNextLifeAt) {
-            saveLivesState(lives, savedHints, nextLifeAt)
-        }
+        // Every puzzle owns its own three-life pool. A mistake in one level no
+        // longer penalises the player in every other level.
+        val lives = prefs.getInt("lives_${level.id}", MAX_LIVES).coerceIn(0, MAX_LIVES)
         _gameState.value = GameState(
             level = level,
             board = saved?.first ?: level.clues.map { it.toList() },
             elapsedSeconds = saved?.second ?: 0,
             lives = lives,
-            hints = savedHints,
-            nextLifeAtMillis = nextLifeAt
+            hints = _hints.value
         )
         startTimer()
         _screen.value = AppScreen.GAME
@@ -190,11 +215,9 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 val newErrors = GameValidator.getErrors(cur.board, cur.level)
                 if (newErrors.isNotEmpty() && cur.errorCells.isEmpty()) {
                     playTone(ToneGenerator.TONE_SUP_ERROR, 180)
-                    val wasFull = cur.lives >= MAX_LIVES
                     val newLives = (cur.lives - 1).coerceAtLeast(0)
-                    val newNextLifeAt = if (wasFull) System.currentTimeMillis() + LIFE_REGEN_MS else cur.nextLifeAtMillis
-                    saveLivesState(newLives, cur.hints, newNextLifeAt)
-                    _gameState.value = cur.copy(errorCells = newErrors, lives = newLives, nextLifeAtMillis = newNextLifeAt)
+                    saveLevelLives(cur.level.id, newLives)
+                    _gameState.value = cur.copy(errorCells = newErrors, lives = newLives)
                     _showBrokenHeart.value = true
                 } else {
                     _gameState.value = cur.copy(errorCells = newErrors)
@@ -208,7 +231,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
             errorJob?.cancel()
             saveCompletedBoard(level.id, newBoard)
             clearBoardState(level.id)
-            saveCompleted(level.id, state.elapsedSeconds, state.hintsUsed)
+            val coinsEarned = saveCompleted(level.id, state.elapsedSeconds, state.hintsUsed)
+            _gameState.value = _gameState.value?.copy(coinsEarned = coinsEarned)
             advanceProgressIfNeeded()
             viewModelScope.launch {
                 delay(400)
@@ -272,8 +296,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val state = _gameState.value ?: return
         errorJob?.cancel()
         clearBoardState(state.level.id)
-        // Lives/hints are a shared pool across all levels, so restarting a
-        // level clears the board only — it does not refill the pool.
+        // Restarting clears the board but keeps this level's remaining lives.
         _gameState.value = state.copy(
             board = state.level.clues.map { it.toList() },
             history = emptyList(),
@@ -291,7 +314,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val hintBoard = revealHintCell(state) ?: return
         playTone(ToneGenerator.TONE_PROP_ACK, 120)
         val newHints = state.hints - 1
-        saveLivesState(state.lives, newHints, state.nextLifeAtMillis)
+        saveHints(newHints)
         _gameState.value = state.copy(
             board = hintBoard,
             hints = newHints,
@@ -303,19 +326,37 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     // Called after the user watches a rewarded ad while out of hints — adds one
     // to the counter rather than revealing a cell directly.
     fun addHint() {
-        val state = _gameState.value ?: return
-        val newHints = state.hints + 1
-        saveLivesState(state.lives, newHints, state.nextLifeAtMillis)
-        _gameState.value = state.copy(hints = newHints)
+        val newHints = _hints.value + 1
+        saveHints(newHints)
+        _gameState.value?.let { state ->
+            _gameState.value = state.copy(hints = newHints)
+        }
+    }
+
+    /** Shop-safe free hint (works even with no active game, e.g. from HOME shop). */
+    fun addHintShop() {
+        addHint()
     }
 
     // Called after the user watches a rewarded ad while out of lives.
     fun addLife() {
         val state = _gameState.value ?: return
         val newLives = (state.lives + 1).coerceAtMost(MAX_LIVES)
-        val newNextLifeAt = if (newLives >= MAX_LIVES) 0L else state.nextLifeAtMillis
-        saveLivesState(newLives, state.hints, newNextLifeAt)
-        _gameState.value = state.copy(lives = newLives, nextLifeAtMillis = newNextLifeAt)
+        saveLevelLives(state.level.id, newLives)
+        _gameState.value = state.copy(lives = newLives)
+    }
+
+    /** Atomically exchanges coins for hints. Returns false when funds are insufficient. */
+    fun buyHints(amount: Int, price: Int): Boolean {
+        if (amount <= 0 || price < 0 || _coins.value < price) return false
+        val newCoins = _coins.value - price
+        val newHints = _hints.value + amount
+        prefs.edit().putInt("coins", newCoins).putInt("hints", newHints).apply()
+        _coins.value = newCoins
+        _hints.value = newHints
+        _gameState.value = _gameState.value?.copy(hints = newHints)
+        playTone(ToneGenerator.TONE_PROP_ACK, 160)
+        return true
     }
 
     private fun revealHintCell(state: GameState): List<List<CellElement>>? {
@@ -398,34 +439,13 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putString("done_board_$levelId", flat).apply()
     }
 
-    // Lives and hints are a single pool shared across every level, not
-    // tracked per level.
-    private fun saveLivesState(lives: Int, hints: Int, nextLifeAtMillis: Long) {
-        prefs.edit()
-            .putInt("lives", lives)
-            .putInt("hints", hints)
-            .putLong("nextlife", nextLifeAtMillis)
-            .apply()
+    private fun saveLevelLives(levelId: Int, lives: Int) {
+        prefs.edit().putInt("lives_$levelId", lives.coerceIn(0, MAX_LIVES)).apply()
     }
 
-    private fun loadLivesState(): Triple<Int, Int, Long> {
-        val lives = prefs.getInt("lives", MAX_LIVES)
-        val hints = prefs.getInt("hints", MAX_HINTS)
-        val nextLifeAt = prefs.getLong("nextlife", 0L)
-        return Triple(lives, hints, nextLifeAt)
-    }
-
-    // Catches lives up on how many hours passed since the regen timer started
-    // (handles the app having been closed for a while).
-    private fun regenLives(lives: Int, nextLifeAtMillis: Long): Pair<Int, Long> {
-        if (lives >= MAX_LIVES || nextLifeAtMillis == 0L) return lives to nextLifeAtMillis
-        val now = System.currentTimeMillis()
-        if (now < nextLifeAtMillis) return lives to nextLifeAtMillis
-        val elapsed = now - nextLifeAtMillis
-        val gained = 1 + (elapsed / LIFE_REGEN_MS).toInt()
-        val newLives = (lives + gained).coerceAtMost(MAX_LIVES)
-        val newNextLifeAt = if (newLives >= MAX_LIVES) 0L else nextLifeAtMillis + gained * LIFE_REGEN_MS
-        return newLives to newNextLifeAt
+    private fun saveHints(value: Int) {
+        prefs.edit().putInt("hints", value).apply()
+        _hints.value = value
     }
 
     private fun startTimer() {
@@ -440,10 +460,15 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun saveCompleted(levelId: Int, elapsedSeconds: Int = 0, hintsUsed: Int = 0) {
+    private fun saveCompleted(levelId: Int, elapsedSeconds: Int = 0, hintsUsed: Int = 0): Int {
         val set = prefs.getStringSet("completed", emptySet())!!.toMutableSet()
-        set.add(levelId.toString())
+        val firstCompletion = set.add(levelId.toString())
         prefs.edit().putStringSet("completed", set).apply()
+        val reward = if (firstCompletion) LEVEL_COIN_REWARD else 0
+        if (reward > 0) {
+            _coins.value += reward
+            prefs.edit().putInt("coins", _coins.value).apply()
+        }
         if (isDaily) {
             updateDailyStreak()
             prefs.edit()
@@ -452,6 +477,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 .apply()
         }
         _stats.value = buildStats()
+        return reward
     }
 
     @SuppressLint("NewApi")

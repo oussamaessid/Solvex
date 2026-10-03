@@ -2,11 +2,12 @@ package app.solvex.model
 
 enum class CellElement { EMPTY, FIRE, WATER }
 enum class ConstraintType { EQUAL, DIFFERENT }
-enum class AppScreen { HOME, GAME, VICTORY, STATS }
+enum class AppScreen { HOME, GAME, VICTORY, STATS, SHOP }
 
-const val MAX_LIVES = 5
-const val MAX_HINTS = 5
-const val LIFE_REGEN_MS = 60 * 60 * 1000L
+const val MAX_LIVES = 3
+const val DEFAULT_HINTS = 2
+const val STARTING_COINS = 50
+const val LEVEL_COIN_REWARD = 20
 
 data class Constraint(
     val r1: Int, val c1: Int,
@@ -34,6 +35,6 @@ data class GameState(
     val hintsUsed: Int = 0,
     val errorCells: Set<Pair<Int, Int>> = emptySet(),
     val lives: Int = MAX_LIVES,
-    val hints: Int = MAX_HINTS,
-    val nextLifeAtMillis: Long = 0L
+    val hints: Int = DEFAULT_HINTS,
+    val coinsEarned: Int = 0
 )

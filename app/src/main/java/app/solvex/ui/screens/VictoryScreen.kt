@@ -4,6 +4,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,6 +42,7 @@ fun VictoryScreen(vm: GameViewModel, darkMode: Boolean) {
     val state by vm.gameState.collectAsState()
     val gs = state ?: return
     val stats by vm.stats.collectAsState()
+    val coins by vm.coins.collectAsState()
 
     val textColor = Color(0xFF1A1A3E)
 
@@ -61,16 +64,18 @@ fun VictoryScreen(vm: GameViewModel, darkMode: Boolean) {
         vm.nextLevel()
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
         ConfettiCanvas()
+        val trophySize = (maxHeight * 0.24f).coerceIn(110.dp, 200.dp)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .scale(contentScale)
                 .alpha(contentAlpha)
                 .padding(24.dp),
@@ -85,7 +90,7 @@ fun VictoryScreen(vm: GameViewModel, darkMode: Boolean) {
             LottieAnimation(
                 composition = trophyComposition,
                 progress = { trophyProgress },
-                modifier = Modifier.size(180.dp)
+                modifier = Modifier.size(trophySize)
             )
 
             Spacer(Modifier.height(16.dp))
@@ -132,6 +137,25 @@ fun VictoryScreen(vm: GameViewModel, darkMode: Boolean) {
             }
 
             Spacer(Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50.dp))
+                    .background(Color(0xFFFFF3CC))
+                    .padding(horizontal = 18.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Text("🪙", fontSize = 20.sp)
+                Text(
+                    if (gs.coinsEarned > 0) "+${gs.coinsEarned}  •  $coins total" else "$coins coins",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF8A5A00)
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
 
             // Level stats
             Row(

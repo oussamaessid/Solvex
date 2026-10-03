@@ -13,6 +13,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -41,7 +43,7 @@ import app.solvex.ui.theme.WaterDeep
 import com.bumptech.glide.Glide
 
 @Composable
-fun GameTutorialOverlay(onFinish: () -> Unit) {
+fun GameTutorialOverlay(onFinish: () -> Unit, onClose: () -> Unit) {
     val solution = remember {
         listOf(
             listOf(CellElement.FIRE, CellElement.FIRE, CellElement.WATER, CellElement.FIRE, CellElement.WATER, CellElement.WATER),
@@ -106,7 +108,9 @@ fun GameTutorialOverlay(onFinish: () -> Unit) {
     ) {
         Column(
             modifier = Modifier
+                .widthIn(max = 520.dp)
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .clip(RoundedCornerShape(28.dp))
                 .background(Color.White)
                 .padding(18.dp),
@@ -118,7 +122,16 @@ fun GameTutorialOverlay(onFinish: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("LEVEL 0 · REQUIRED", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color(0xFF6666AA), letterSpacing = 1.2.sp)
-                Text("${step.coerceAtMost(6)}/6", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = FireOrange)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${step.coerceAtMost(6)}/6", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = FireOrange)
+                    Spacer(Modifier.width(10.dp))
+                    Box(
+                        Modifier.size(32.dp).clip(CircleShape).background(Color(0xFFF0F2FF)).clickable(onClick = onClose),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("✕", fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color(0xFF6666AA))
+                    }
+                }
             }
 
             Spacer(Modifier.height(8.dp))

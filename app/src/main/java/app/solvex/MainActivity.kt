@@ -19,6 +19,7 @@ import app.solvex.model.AppScreen
 import app.solvex.ui.screens.GameScreen
 import app.solvex.ui.screens.HomeScreen
 import app.solvex.ui.screens.StatsScreen
+import app.solvex.ui.screens.ShopScreen
 import app.solvex.ui.screens.VictoryScreen
 import app.solvex.ui.theme.SolvexTheme
 import app.solvex.viewmodel.GameViewModel
@@ -59,6 +60,7 @@ fun ElementFlowApp(vm: GameViewModel, darkMode: Boolean) {
             AppScreen.GAME    -> GameScreen(vm = vm, darkMode = darkMode)
             AppScreen.VICTORY -> VictoryScreen(vm = vm, darkMode = darkMode)
             AppScreen.STATS   -> StatsScreen(vm = vm)
+            AppScreen.SHOP    -> ShopScreen(vm = vm)
         }
     }
 }
